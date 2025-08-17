@@ -46,17 +46,30 @@ def run() -> str:
                 log.write(f"Parsed rows: {len(rows)}\n")
                 all_rows.extend(rows)
 
+            # превращаем в «офферы» (для теста shop="training-site")
+            offers = []
+            for r in all_rows:
+                offers.append({
+                    "shop": "training-site",
+                    "title": f"{r['author']}: {r['text'][:50]}",
+                    "price": None,            # в учебных данных цены нет
+                    "url": BASE               # тоже учебное
+                })
+
+            # сохраняем в БД и экспортим Excel
+            from db import save_offers, export_to_excel
+            save_offers(offers)
             out_path = os.path.join("results", "results.xlsx")
-            pd.DataFrame(all_rows).to_excel(out_path, index=False)
-            print(f"Saved {len(all_rows)} rows to {out_path}")
-            log.write(f"Saved {len(all_rows)} rows to {out_path}\n")
+            export_to_excel(out_path)
+
+            print(f"Saved {len(offers)} offers → {out_path}")
+            log.write(f"Saved {len(offers)} offers → {out_path}\n")
             return out_path
 
         except Exception as e:
             err = traceback.format_exc()
             print("ERROR:", e)
             log.write(err + "\n")
-            # создадим пустой xlsx, чтобы артефакт точно был
             out_path = os.path.join("results", "results.xlsx")
             pd.DataFrame([]).to_excel(out_path, index=False)
             return out_path
