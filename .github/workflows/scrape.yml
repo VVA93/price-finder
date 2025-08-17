@@ -1,20 +1,28 @@
-name: scrape
+name: Scrape
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
-  run:
+  scrape:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: '3.10'
 
-      - name: Run script
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scraper
         run: python src/main.py
+
+      - name: Upload results
+        uses: actions/upload-artifact@v3
+        with:
+          name: results
+          path: results.xlsx
