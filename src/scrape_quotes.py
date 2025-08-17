@@ -1,11 +1,11 @@
 import os
 import time
+import traceback
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 
 BASE = "https://quotes.toscrape.com"
-
 HEADERS = {
     "User-Agent": "PriceFinder/0.1 (+https://github.com/VVA93/price-finder)"
 }
@@ -16,7 +16,7 @@ def fetch_page(url: str) -> str:
         if r.status_code == 200:
             return r.text
         time.sleep(1 + i)
-    return ""
+    raise RuntimeError(f"Failed to fetch {url}, status={r.status_code}")
 
 def parse_page(html: str):
     soup = BeautifulSoup(html, "lxml")
@@ -26,26 +26,37 @@ def parse_page(html: str):
         author = q.select_one(".author").get_text(strip=True)
         tags = [t.get_text(strip=True) for t in q.select(".tag")]
         items.append({"text": text, "author": author, "tags": ", ".join(tags)})
-    # ссылка на следующую страницу
     next_a = soup.select_one("li.next > a")
-    next_url = BASE + next_a.get("href") if next_a else None
+    next_url = f"{BASE}{next_a.get('href')}" if next_a else None
     return items, next_url
 
-def run():
-    url = f"{BASE}/page/1/"
-    all_rows = []
-    while url:
-        html = fetch_page(url)
-        if not html:
-            break
-        rows, url = parse_page(html)
-        all_rows.extend(rows)
-
-    # Сохраняем результат
+def run() -> str:
     os.makedirs("results", exist_ok=True)
-    out_path = os.path.join("results", "results.xlsx")
-    pd.DataFrame(all_rows).to_excel(out_path, index=False)
-    print(f"Saved {len(all_rows)} rows to {out_path}")
+    os.makedirs("logs", exist_ok=True)
 
-if __name__ == "__main__":
-    run()
+    log_path = os.path.join("logs", "run.log")
+    with open(log_path, "w", encoding="utf-8") as log:
+        try:
+            url = f"{BASE}/page/1/"
+            all_rows = []
+            while url:
+                log.write(f"Fetch: {url}\n")
+                html = fetch_page(url)
+                rows, url = parse_page(html)
+                log.write(f"Parsed rows: {len(rows)}\n")
+                all_rows.extend(rows)
+
+            out_path = os.path.join("results", "results.xlsx")
+            pd.DataFrame(all_rows).to_excel(out_path, index=False)
+            print(f"Saved {len(all_rows)} rows to {out_path}")
+            log.write(f"Saved {len(all_rows)} rows to {out_path}\n")
+            return out_path
+
+        except Exception as e:
+            err = traceback.format_exc()
+            print("ERROR:", e)
+            log.write(err + "\n")
+            # создадим пустой xlsx, чтобы артефакт точно был
+            out_path = os.path.join("results", "results.xlsx")
+            pd.DataFrame([]).to_excel(out_path, index=False)
+            return out_path
